@@ -66,7 +66,7 @@ public final class MecanumDrive {
 
         // feedforward parameters (in tick units)
         public double kS = 4.654950770274398;
-        public double kV =  0.004263056923610808;
+        public double kV = 0.004263056923610808;
         public double kA = 0.001;
 
         // path profile parameters (in inches)
@@ -134,7 +134,6 @@ public final class MecanumDrive {
 
             imu = lazyImu.get();
 
-            // TODO: reverse encoders if needed
             leftBack.setDirection(DcMotorSimple.Direction.REVERSE);
             leftFront.setDirection(DcMotorSimple.Direction.REVERSE);
 
@@ -153,7 +152,7 @@ public final class MecanumDrive {
 
         @Override
         public int[] wheelPositions() {
-            return new int[] {
+            return new int[]{
                     leftFront.getPositionAndVelocity().position,
                     leftBack.getPositionAndVelocity().position,
                     rightFront.getPositionAndVelocity().position,
@@ -470,14 +469,14 @@ public final class MecanumDrive {
     public PoseVelocity2d updatePoseEstimate() {
         PoseVelocity2d vel = localizer.update();
         poseHistory.add(localizer.getPose());
-        
+
         while (poseHistory.size() > 100) {
             poseHistory.removeFirst();
         }
 
         estimatedPoseWriter.write(new PoseMessage(localizer.getPose()));
-        
-        
+
+
         return vel;
     }
 
