@@ -70,6 +70,11 @@ public final class TwoDeadWheelLocalizer implements Localizer {
     }
 
     @Override
+    public int[] wheelPositions() {
+        return new int[] {};
+    }
+
+    @Override
     public Pose2d getPose() {
         return pose;
     }

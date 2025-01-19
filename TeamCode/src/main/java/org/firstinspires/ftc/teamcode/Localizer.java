@@ -22,4 +22,6 @@ public interface Localizer {
      * @return the Localizer's current velocity estimate
      */
     PoseVelocity2d update();
+
+    int[] wheelPositions();
 }

@@ -158,6 +158,11 @@ public final class TankDrive {
         }
 
         @Override
+        public int[] wheelPositions() {
+            return new int[] {};
+        }
+
+        @Override
         public void setPose(Pose2d pose) {
             this.pose = pose;
         }
