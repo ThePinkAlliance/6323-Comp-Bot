@@ -6,6 +6,7 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 public class Arm {
@@ -21,6 +22,10 @@ public class Arm {
         this.extendMotorTwo = map.get(DcMotorEx.class, "extendTwo");
 
         pivotMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        extendMotorOne.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        extendMotorTwo.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        extendMotorTwo.setDirection(DcMotorSimple.Direction.REVERSE);
     }
 
     public Action extendTo(double pos) {
