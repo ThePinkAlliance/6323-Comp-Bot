@@ -360,7 +360,7 @@ public final class MecanumDrive {
             p.put("leftFrontPower", leftFrontPower);
             p.put("leftBackPower", leftBackPower);
             p.put("rightFrontPower", rightFrontPower);
-            p.put("rightBackPower", rightBackPower);
+            p.put("rightBackPower", feedforward.compute(wheelVels.rightBack));
 
             // only draw when active; only one drive action should be active at a time
             Canvas c = p.fieldOverlay();
