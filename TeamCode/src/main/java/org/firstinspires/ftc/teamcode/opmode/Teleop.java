@@ -58,16 +58,16 @@ public class Teleop extends LinearOpMode {
             pivotEffort = MathUtils.Helpers.clamp(pivotEffort, -1, 1);
 
             if (gamepad1.a) {
-                executor.addToQueue(new SequentialAction(rotateArm(1.67), extendArm((MAX_EXTEND_ROTATIONS) / 2, extendOne, extendTwo)));
+                executor.run(new SequentialAction(rotateArm(1.67), extendArm((MAX_EXTEND_ROTATIONS) / 2, extendOne, extendTwo)));
             }
 
             if (gamepad1.y) {
-                executor.addToQueue(new SequentialAction(rotateArm(1.67), extendArm((MAX_EXTEND_ROTATIONS), extendOne, extendTwo)));
+                executor.run(new SequentialAction(rotateArm(1.67), extendArm((MAX_EXTEND_ROTATIONS), extendOne, extendTwo)));
             }
 
             if (gamepad1.b) {
                 // -0.15 was estimated to close to specified encoder counts when at rest but I didn't get to test before leaving.
-                executor.addToQueue(new SequentialAction(extendArm(0, extendOne, extendTwo), rotateArm(-0.15)));
+                executor.run(new SequentialAction(extendArm(0, extendOne, extendTwo), rotateArm(-0.15)));
             }
 
             telemetry.addData("control effort", pivotEffort);

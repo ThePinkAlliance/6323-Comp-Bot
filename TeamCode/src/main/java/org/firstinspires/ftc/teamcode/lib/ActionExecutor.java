@@ -14,11 +14,18 @@ public class ActionExecutor {
         currentAction = null;
     }
 
-    public void addToQueue(Action action) {
+    /**
+     * Selects the action that will be executed
+     * @param action
+     */
+    public void run(Action action) {
         this.dashboard = FtcDashboard.getInstance();
         this.currentAction = action;
     }
 
+    /**
+     * Runs the currently selected action until finished
+     */
     public void execute() {
         TelemetryPacket packet = new TelemetryPacket();
 
