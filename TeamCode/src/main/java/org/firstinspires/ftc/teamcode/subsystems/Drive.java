@@ -27,8 +27,8 @@ public class Drive {
         // Equations below is motor speed for each wheel
         double v1 = r * Math.cos(robotAngle) - rightX;
         double v2 = r * Math.sin(robotAngle) + rightX;
-        double v3 = r * Math.sin(robotAngle) + rightX;
-        double v4 = r * Math.cos(robotAngle) - rightX;
+        double v3 = r * Math.sin(robotAngle) - rightX;
+        double v4 = r * Math.cos(robotAngle) + rightX;
 
         // If not turning give each wheel full power
         if (x == 0) {
@@ -42,5 +42,21 @@ public class Drive {
         frontRight.setPower(v2);
         backLeft.setPower(v3);
         backRight.setPower(v4);
+    }
+
+    public double getLeftFrontVel() {
+        return this.frontLeft.getVelocity();
+    }
+
+    public double getRightFrontVel() {
+        return this.frontRight.getVelocity();
+    }
+
+    public double getLeftBackVel() {
+        return this.backLeft.getVelocity();
+    }
+
+    public double getRightBackVel() {
+        return this.backRight.getVelocity();
     }
 }
