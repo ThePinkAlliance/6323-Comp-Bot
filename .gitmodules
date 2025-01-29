@@ -1,0 +1,3 @@
+[submodule "Witty-Dashboard"]
+	path = Witty-Dashboard
+	url = https://github.com/FRC-For-FTC-Tools/Witty-Dashboard.git

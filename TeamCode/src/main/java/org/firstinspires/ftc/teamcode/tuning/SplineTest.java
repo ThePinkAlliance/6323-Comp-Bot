@@ -10,6 +10,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 
+// http://192.168.43.1:8080/dash
 public final class SplineTest extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
@@ -20,7 +21,7 @@ public final class SplineTest extends LinearOpMode {
 
         Actions.runBlocking(
                 drive.actionBuilder(beginPose)
-                        .strafeTo(new Vector2d(0, 10))
+                        .splineToConstantHeading(new Vector2d(10, 30), Math.PI/2)
                         .build()
                 );
 
