@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.opmode;
 
 import androidx.annotation.NonNull;
 
+import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.SequentialAction;
@@ -28,11 +29,12 @@ public class Teleop extends LinearOpMode {
     // On arm extend subtracted 0.5 from max extend length and it reached max
     private final double MAX_EXTEND_ROTATIONS = 6.539 - 0.5;
     private final double PIVOT_ZERO_OFFSET_RAD = 0.6258;
-
     // Amount of encoder ticks per rotation
     private final double PIVOT_GEAR_RATIO = (1/5281.1);
-    private PIController pivotController = new PIController(1, 0.002);
-    private PIController extendController = new PIController(0.5, 0.0005);
+    private final double COMPENSATION_VOLTAGE = 12.30;
+    private final double HIGH_BUCKET_ANGLE = 1.83;
+    public PIController pivotController = new PIController(1, 0.002);
+    public PIController extendController = new PIController(0.5, 0.001);
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -40,8 +42,8 @@ public class Teleop extends LinearOpMode {
         DcMotorEx extendOne = hardwareMap.get(DcMotorEx.class, "extendOne");
         DcMotorEx extendTwo = hardwareMap.get(DcMotorEx.class, "extendTwo");
 
-        CRServo leftCollectSero = hardwareMap.get(CRServo.class, "vexleft");
-        CRServo rightCollectSero = hardwareMap.get(CRServo.class, "vexright");
+        CRServo leftCollectServo = hardwareMap.get(CRServo.class, "vexleft");
+        CRServo rightCollectServo = hardwareMap.get(CRServo.class, "vexright");
 
         ActionExecutor executor = new ActionExecutor();
         VoltageSensor voltageSensor = hardwareMap.voltageSensor.iterator().next();
@@ -54,27 +56,27 @@ public class Teleop extends LinearOpMode {
         pivotMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         extendOne.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
-        // Starts Network Tables server to broadcast debug data
-        WittyDashboard.start(this);
-
         waitForStart();
 
         while (opModeIsActive()) {
+            pivotController.setSetpoint(pivotController.getSetpoint() + gamepad2.left_stick_y * 0.09817477);
+            extendController.setSetpoint(extendController.getSetpoint() + gamepad2.right_stick_y * (MAX_EXTEND_ROTATIONS / 32));
+
             if (gamepad1.a) {
-                executor.run(new SequentialAction(rotateArm(1.60), extendArm(MAX_EXTEND_ROTATIONS / 2, extendOne, extendTwo)));
+                executor.run(new SequentialAction(rotateArm(HIGH_BUCKET_ANGLE), extendArm(MAX_EXTEND_ROTATIONS / 2, extendOne, extendTwo)));
             }
 
             if (gamepad1.y) {
-                executor.run(new SequentialAction(rotateArm(1.60), extendArm(MAX_EXTEND_ROTATIONS, extendOne, extendTwo)));
+                executor.run(new SequentialAction(rotateArm(HIGH_BUCKET_ANGLE), extendArm(MAX_EXTEND_ROTATIONS, extendOne, extendTwo)));
             }
 
             // Run the vex servos to run the collector
             if (gamepad1.x) {
-                leftCollectSero.setPower(0.88);
-                rightCollectSero.setPower(0.88);
+                leftCollectServo.setPower(0.88);
+                rightCollectServo.setPower(0.88);
             } else {
-                leftCollectSero.setPower(0);
-                rightCollectSero.setPower(0);
+                leftCollectServo.setPower(0);
+                rightCollectServo.setPower(0);
             }
 
             if (gamepad1.b) {
@@ -82,15 +84,13 @@ public class Teleop extends LinearOpMode {
                 executor.run(new SequentialAction(extendArm(0, extendOne, extendTwo), rotateArm(-0.15)));
             }
 
-            executePivotControl(pivotMotor);
-            executeExtendControl(extendOne, extendTwo);
+            executePivotControl(pivotMotor, voltageSensor);
+            executeExtendControl(extendOne, extendTwo, voltageSensor);
 
             telemetry.addData("back right vel", drive.getRightBackVel());
             telemetry.addData("back left vel", drive.getLeftBackVel());
             telemetry.addData("front left vel", drive.getLeftFrontVel());
             telemetry.addData("front right vel", drive.getRightFrontVel());
-
-            WittyDashboard.put("voltage", voltageSensor.getVoltage());
 
             drive.setDriveCommand(gamepad1.left_stick_x * -1, gamepad1.left_stick_y, gamepad1.right_stick_x);
 
@@ -103,15 +103,12 @@ public class Teleop extends LinearOpMode {
      * executePivotControl runs the pivot pid controller to maintain the desired setpoint of the arm during a match.
      * In order to control the arm you need to call the pivot pid controller separately.
      */
-    private void executePivotControl(DcMotorEx pivotMotor) {
+    private void executePivotControl(DcMotorEx pivotMotor, VoltageSensor voltageSensor) {
         double motorRotationsRad = (pivotMotor.getCurrentPosition() * PIVOT_GEAR_RATIO * 2 * Math.PI);
-        double pivotEffort = pivotController.calculate(motorRotationsRad);
+        double pivotEffort = pivotController.calculate(motorRotationsRad) * (COMPENSATION_VOLTAGE / voltageSensor.getVoltage());
         pivotEffort = MathUtils.Helpers.clamp(pivotEffort, -1, 1);
 
         pivotMotor.setPower(pivotEffort);
-
-        WittyDashboard.put("pivotError", pivotController.getError().get());
-        WittyDashboard.put("pivotSetpoint", pivotController.getSetpoint());
 
         telemetry.addData("control effort", pivotEffort);
         telemetry.addData("pivot rotations", motorRotationsRad);
@@ -122,15 +119,12 @@ public class Teleop extends LinearOpMode {
      * executeExtendControl runs the extend pid controller to maintain the desired setpoint of the arm during a match.
      * In order to control the arm you need to call the extend pid controller separately.
      */
-    private void executeExtendControl(DcMotorEx extendOne, DcMotorEx extendTwo) {
+    private void executeExtendControl(DcMotorEx extendOne, DcMotorEx extendTwo, VoltageSensor voltageSensor) {
         double currentExtend1 = extendOne.getCurrentPosition() * -0.001859773;
-        double extendEffort = MathUtils.Helpers.clamp(extendController.calculate(currentExtend1), -1, 1);
+        double extendEffort = MathUtils.Helpers.clamp(extendController.calculate(currentExtend1) * (COMPENSATION_VOLTAGE / voltageSensor.getVoltage()), -1, 1);
 
         extendTwo.setPower(extendEffort);
         extendOne.setPower(extendEffort);
-
-        WittyDashboard.put("extendError", extendController.getError().get());
-        WittyDashboard.put("extendSetpoint", extendController.getSetpoint());
 
         telemetry.addData("extend", currentExtend1);
         telemetry.addData("extend effort", extendEffort);
@@ -153,7 +147,7 @@ public class Teleop extends LinearOpMode {
                 }
 
                 // Exit if below 0.15 rotations of error
-                if (Math.abs(extendController.getError().get()) <= 0.15) {
+                if (Math.abs(extendController.getError().get()) <= 0.20) {
                     return false;
                 }
 
