@@ -48,5 +48,5 @@ dependencies {
     implementation "com.acmerobotics.dashboard:dashboard:0.4.16"
     implementation 'androidx.core:core-ktx:1.10.1'
 
-    implementation project(":Witty-Dashboard")
+//    implementation project(":Witty-Dashboard")
 }

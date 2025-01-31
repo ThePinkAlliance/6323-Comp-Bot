@@ -60,7 +60,7 @@ public final class SplineTest extends LinearOpMode {
                 .build();
 
         Action goToBucketStrafe = drive.actionBuilder(beginPose)
-                        .strafeTo(new Vector2d(10, 0))
+                        .strafeTo(new Vector2d(0, 10))
                                 .build();
 
         Actions.runBlocking(
@@ -81,7 +81,7 @@ public final class SplineTest extends LinearOpMode {
                 executePivotControl(pivotMotor, voltageSensor);
                 executeExtendControl(extendOne, extendTwo, voltageSensor);
 
-                return false;
+                return true;
             }
         };
     }
