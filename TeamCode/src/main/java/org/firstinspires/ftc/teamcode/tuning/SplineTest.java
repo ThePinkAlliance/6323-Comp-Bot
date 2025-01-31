@@ -26,6 +26,8 @@ import org.firstinspires.ftc.teamcode.subsystems.Drive;
 public final class SplineTest extends LinearOpMode {
     private final double COMPENSATION_VOLTAGE = 12.30;
     private final double PIVOT_GEAR_RATIO = (1/5281.1);
+    private final double MAX_EXTEND_ROTATIONS = 6.539 - 0.5;
+
     public PIController pivotController = new PIController(1, 0.002);
     public PIController extendController = new PIController(0.5, 0.001);
 
@@ -57,9 +59,19 @@ public final class SplineTest extends LinearOpMode {
                 .splineToConstantHeading(new Vector2d(10, 30), 0)
                 .build();
 
+        Action goToBucketStrafe = drive.actionBuilder(beginPose)
+                        .strafeTo(new Vector2d(10, 0))
+                                .build();
+
         Actions.runBlocking(
-                    new ParallelAction(controlAction(extendOne, extendTwo, pivotMotor, voltageSensor), new SequentialAction())
-                );
+                    new ParallelAction(
+                         controlAction(extendOne, extendTwo, pivotMotor, voltageSensor),
+                        new SequentialAction(
+                            goToBucketStrafe,
+                                rotateArm(1.7),
+                                extendArm(MAX_EXTEND_ROTATIONS)
+                        )
+                ));
     }
 
     public Action controlAction(DcMotorEx extendOne, DcMotorEx extendTwo, DcMotorEx pivotMotor, VoltageSensor voltageSensor) {
@@ -108,11 +120,9 @@ public final class SplineTest extends LinearOpMode {
 
     /**
      * @param distance in rotations
-     * @param extendOne left extend motor
-     * @param extendTwo right extend motor (without encoder cable)
      * @return
      */
-    public Action extendArm(double distance, DcMotorEx extendOne, DcMotorEx extendTwo) {
+    public Action extendArm(double distance) {
         return new Action() {
             boolean init = false;
             @Override
