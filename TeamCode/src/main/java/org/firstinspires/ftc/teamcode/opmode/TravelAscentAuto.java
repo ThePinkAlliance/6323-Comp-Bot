@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.tuning;
+package org.firstinspires.ftc.teamcode.opmode;
 
 import androidx.annotation.NonNull;
 
@@ -9,6 +9,7 @@ import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.SequentialAction;
 import com.acmerobotics.roadrunner.ftc.Actions;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -20,10 +21,9 @@ import org.firstinspires.ftc.teamcode.MathUtils;
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.PIController;
 
-/**
- * THIS AUTO HAS BEEN DISABLED AND IS ONLY HERE AS AN EXAMPLE NOW.
- */
-public final class SplineTest extends LinearOpMode {
+// http://192.168.43.1:8080/dash
+@Autonomous(name = "Travel to Ascent")
+public final class TravelAscentAuto extends LinearOpMode {
     private boolean autoIsComplete = false;
     private final double COMPENSATION_VOLTAGE = 12.30;
     private final double PIVOT_GEAR_RATIO = (1/5281.1);
@@ -55,28 +55,11 @@ public final class SplineTest extends LinearOpMode {
 
         waitForStart();
 
-        Action goToBucketStrafe = drive.actionBuilder(beginPose)
-                        .lineToY(20)
-                                .build();
         Action leave = drive.actionBuilder(new Pose2d(0, 20, 0)).lineToX(40).build();
-        Action wait = drive.actionBuilder(new Pose2d(40, 20, 0)).waitSeconds(2).build();
-
         Actions.runBlocking(
                     new ParallelAction(
                          controlAction(extendOne, extendTwo, pivotMotor, voltageSensor),
                         new SequentialAction(
-                            goToBucketStrafe,
-                                // Rotate the arm to straight vertical
-                                rotateArm(2.58),
-                                // Extend to maximum distance
-                                extendArm(MAX_EXTEND_ROTATIONS),
-                                // Spin the collector
-                                new InstantAction(() -> { leftCollectServo.setPosition(0.88); rightCollectServo.setPosition(0.88); }),
-                                wait,
-                                // Stop the collector
-                                new InstantAction(() -> { leftCollectServo.setPosition(0); rightCollectServo.setPosition(0); }),
-                                // Bring the arm to zero
-                                extendArm(0),
                                 leave,
                                 // Stop any parallel actions
                                 new InstantAction(() -> autoIsComplete = true)

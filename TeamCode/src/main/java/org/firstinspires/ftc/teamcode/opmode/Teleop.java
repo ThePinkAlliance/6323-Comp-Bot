@@ -12,6 +12,7 @@ import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.teamcode.MathUtils;
@@ -31,7 +32,7 @@ public class Teleop extends LinearOpMode {
     // Amount of encoder ticks per rotation
     private final double PIVOT_GEAR_RATIO = (1/5281.1);
     private final double COMPENSATION_VOLTAGE = 12.30;
-    private final double HIGH_BUCKET_ANGLE = 1.83;
+    private final double HIGH_BUCKET_ANGLE = 2.58;
     public PIController pivotController = new PIController(1, 0.002);
     public PIController extendController = new PIController(0.5, 0.001);
 
@@ -41,8 +42,9 @@ public class Teleop extends LinearOpMode {
         DcMotorEx extendOne = hardwareMap.get(DcMotorEx.class, "extendOne");
         DcMotorEx extendTwo = hardwareMap.get(DcMotorEx.class, "extendTwo");
 
-        CRServo leftCollectServo = hardwareMap.get(CRServo.class, "vexleft");
-        CRServo rightCollectServo = hardwareMap.get(CRServo.class, "vexright");
+        Servo leftCollectServo = hardwareMap.get(Servo.class, "vexleft");
+        Servo rightCollectServo = hardwareMap.get(Servo.class, "vexright");
+        Servo bumper = hardwareMap.get(Servo.class, "bumper");
 
         ActionExecutor executor = new ActionExecutor();
         VoltageSensor voltageSensor = hardwareMap.voltageSensor.iterator().next();
@@ -50,6 +52,9 @@ public class Teleop extends LinearOpMode {
 
         extendOne.setDirection(DcMotorSimple.Direction.FORWARD);
         extendTwo.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        leftCollectServo.setDirection(Servo.Direction.REVERSE);
+        rightCollectServo.setDirection(Servo.Direction.REVERSE);
 
         pivotMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         pivotMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
@@ -70,12 +75,18 @@ public class Teleop extends LinearOpMode {
             }
 
             // Run the vex servos to run the collector
-            if (gamepad1.x) {
-                leftCollectServo.setPower(0.88);
-                rightCollectServo.setPower(0.88);
+            if (gamepad1.right_bumper) {
+                bumper.setPosition(0);
             } else {
-                leftCollectServo.setPower(0);
-                rightCollectServo.setPower(0);
+                bumper.setPosition(0.2);
+            }
+
+            if (gamepad1.left_bumper) {
+                leftCollectServo.setPosition(0.88);
+                rightCollectServo.setPosition(0.88);
+            } else {
+                leftCollectServo.setPosition(0);
+                rightCollectServo.setPosition(0);
             }
 
             if (gamepad1.b) {
