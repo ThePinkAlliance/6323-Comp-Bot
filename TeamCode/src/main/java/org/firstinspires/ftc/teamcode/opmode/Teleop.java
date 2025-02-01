@@ -66,22 +66,22 @@ public class Teleop extends LinearOpMode {
             pivotController.setSetpoint(pivotController.getSetpoint() + gamepad2.left_stick_y * 0.09817477);
             extendController.setSetpoint(extendController.getSetpoint() + gamepad2.right_stick_y * (MAX_EXTEND_ROTATIONS / 32));
 
-            if (gamepad1.a) {
+            if (gamepad2.a) {
                 executor.run(new SequentialAction(rotateArm(HIGH_BUCKET_ANGLE), extendArm(MAX_EXTEND_ROTATIONS / 2, extendOne, extendTwo)));
             }
 
-            if (gamepad1.y) {
+            if (gamepad2.y) {
                 executor.run(new SequentialAction(rotateArm(HIGH_BUCKET_ANGLE), extendArm(MAX_EXTEND_ROTATIONS, extendOne, extendTwo)));
             }
 
             // Run the vex servos to run the collector
-            if (gamepad1.right_bumper) {
+            if (gamepad2.right_bumper) {
                 bumper.setPosition(0);
             } else {
                 bumper.setPosition(0.2);
             }
 
-            if (gamepad1.left_bumper) {
+            if (gamepad2.left_bumper) {
                 leftCollectServo.setPosition(0.88);
                 rightCollectServo.setPosition(0.88);
             } else {
@@ -89,7 +89,7 @@ public class Teleop extends LinearOpMode {
                 rightCollectServo.setPosition(0);
             }
 
-            if (gamepad1.b) {
+            if (gamepad2.b) {
                 // -0.15 was estimated to close to specified encoder counts when at rest but I didn't get to test before leaving.
                 executor.run(new SequentialAction(extendArm(0, extendOne, extendTwo), rotateArm(-0.15)));
             }
