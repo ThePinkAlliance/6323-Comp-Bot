@@ -12,6 +12,7 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
@@ -22,13 +23,15 @@ import org.firstinspires.ftc.teamcode.MathUtils;
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.PIController;
 
+import java.util.Timer;
+
 // http://192.168.43.1:8080/dash
 @Autonomous(name = "High Bucket Ascent")
 public final class HighBucketToAscentAuto extends LinearOpMode {
     private boolean autoIsComplete = false;
     private final double COMPENSATION_VOLTAGE = 12.30;
     private final double PIVOT_GEAR_RATIO = (1/5281.1);
-    private final double MAX_EXTEND_ROTATIONS = 6.539 - 0.5;
+    private final double MAX_EXTEND_ROTATIONS = 6.539;
 
     public PIController pivotController = new PIController(1, 0.002);
     public PIController extendController = new PIController(0.5, 0.001);
@@ -39,8 +42,9 @@ public final class HighBucketToAscentAuto extends LinearOpMode {
         DcMotorEx extendOne = hardwareMap.get(DcMotorEx.class, "extendOne");
         DcMotorEx extendTwo = hardwareMap.get(DcMotorEx.class, "extendTwo");
 
-        Servo leftCollectServo = hardwareMap.get(Servo.class, "vexleft");
-        Servo rightCollectServo = hardwareMap.get(Servo.class, "vexright");
+        CRServo leftCollectServo = hardwareMap.get(CRServo.class, "vexleft");
+        CRServo rightCollectServo = hardwareMap.get(CRServo.class, "vexright");
+        Servo bumper = hardwareMap.get(Servo.class, "bumper");
 
         VoltageSensor voltageSensor = hardwareMap.voltageSensor.iterator().next();
 
@@ -50,6 +54,9 @@ public final class HighBucketToAscentAuto extends LinearOpMode {
         extendOne.setDirection(DcMotorSimple.Direction.FORWARD);
         extendTwo.setDirection(DcMotorSimple.Direction.REVERSE);
 
+        leftCollectServo.setDirection(DcMotorSimple.Direction.REVERSE);
+        rightCollectServo.setDirection(DcMotorSimple.Direction.REVERSE);
+
         pivotMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         pivotMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         extendOne.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -57,28 +64,30 @@ public final class HighBucketToAscentAuto extends LinearOpMode {
         waitForStart();
 
         Action goToBucketStrafe = drive.actionBuilder(beginPose)
-                .strafeTo(new Vector2d(-10, 20))
+                .strafeTo(new Vector2d(-13, 17))
                                 .build();
-        Action leave = drive.actionBuilder(new Pose2d(-10, 20, 0)).splineTo(new Vector2d(30, 20), Math.PI).build();
+        Action leave = drive.actionBuilder(new Pose2d(-10, 15, 0)).strafeToSplineHeading(new Vector2d(15, 40), -Math.PI/6).strafeToSplineHeading(new Vector2d(40, 40), -Math.PI/6).build();
         Action wait = drive.actionBuilder(new Pose2d(40, 20, 0)).waitSeconds(2).build();
 
         Actions.runBlocking(
-                    new ParallelAction(
-                         controlAction(extendOne, extendTwo, pivotMotor, voltageSensor),
+                    new ParallelAction(controlAction(extendOne, extendTwo, pivotMotor, voltageSensor),
                         new SequentialAction(
-                            goToBucketStrafe,
-                                // Rotate the arm to straight vertical
-                                rotateArm(2.58),
                                 // Extend to maximum distance
-                                extendArm(MAX_EXTEND_ROTATIONS),
+                                goToBucketStrafe,
+                                rotateArm(2.24),
+                                // Rotate the arm to straight vertical
+                                drive.actionBuilder(new Pose2d(-10, 15, 0)).waitSeconds(1).build(),
                                 // Spin the collector
-                                new InstantAction(() -> { leftCollectServo.setPosition(0.88); rightCollectServo.setPosition(0.88); }),
+                                new InstantAction(() -> {
+                                    bumper.setPosition(0);
+                                    leftCollectServo.setPower(0.4);
+                                    rightCollectServo.setPower(0.4);
+                                }),
                                 wait,
                                 // Stop the collector
-                                new InstantAction(() -> { leftCollectServo.setPosition(0); rightCollectServo.setPosition(0); }),
+                                new InstantAction(() -> { leftCollectServo.setPower(0); rightCollectServo.setPower(0); bumper.setPosition(0.2); }),
                                 // Bring the arm to zero
-                                extendArm(0),
-                                leave,
+                                new ParallelAction(leave, rotateArm(1.34)),
                                 // Stop any parallel actions
                                 new InstantAction(() -> autoIsComplete = true)
                         )
@@ -143,10 +152,16 @@ public final class HighBucketToAscentAuto extends LinearOpMode {
     public Action extendArm(double distance) {
         return new Action() {
             boolean init = false;
+            double startTime = 0;
             @Override
             public boolean run(@NonNull TelemetryPacket telemetryPacket) {
                 if (!init) {
                     extendController.setSetpoint(distance);
+                    startTime = System.currentTimeMillis();
+                }
+
+                if ((System.currentTimeMillis() - startTime) >= 1000) {
+                    return false;
                 }
 
                 // Exit if below 0.15 rotations of error
@@ -174,12 +189,17 @@ public final class HighBucketToAscentAuto extends LinearOpMode {
     public Action rotateArm(double angle) {
         return new Action() {
             boolean init = false;
-
+            double startTime = 0;
             @Override
             public boolean run(@NonNull TelemetryPacket telemetryPacket) {
                 if (init == false) {
                     pivotController.setSetpoint(angle);
                     init = true;
+                    startTime = System.currentTimeMillis();
+                }
+
+                if ((System.currentTimeMillis() - startTime) >= 1000) {
+                    return false;
                 }
 
                 // Exit if below 0.15 radians of error

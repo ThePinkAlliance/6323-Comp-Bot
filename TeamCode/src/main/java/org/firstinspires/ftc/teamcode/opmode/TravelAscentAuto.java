@@ -8,6 +8,7 @@ import com.acmerobotics.roadrunner.InstantAction;
 import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.SequentialAction;
+import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -55,7 +56,7 @@ public final class TravelAscentAuto extends LinearOpMode {
 
         waitForStart();
 
-        Action leave = drive.actionBuilder(new Pose2d(0, 20, 0)).lineToX(40).build();
+        Action leave = drive.actionBuilder(new Pose2d(-10, 15, 0)).strafeToSplineHeading(new Vector2d(15, 40), -45).strafeToSplineHeading(new Vector2d(40, 40), -40).build();
         Actions.runBlocking(
                     new ParallelAction(
                          controlAction(extendOne, extendTwo, pivotMotor, voltageSensor),

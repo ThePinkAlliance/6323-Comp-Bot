@@ -2,7 +2,6 @@ package org.firstinspires.ftc.teamcode.opmode;
 
 import androidx.annotation.NonNull;
 
-import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.SequentialAction;
@@ -27,14 +26,14 @@ import org.firstinspires.ftc.teamcode.subsystems.Drive;
 @TeleOp(name = "Teleop")
 public class Teleop extends LinearOpMode {
     // On arm extend subtracted 0.5 from max extend length and it reached max
-    private final double MAX_EXTEND_ROTATIONS = 6.539 - 0.5;
+    private final double MAX_EXTEND_ROTATIONS = 6.539;
     private final double PIVOT_ZERO_OFFSET_RAD = 0.6258;
     // Amount of encoder ticks per rotation
     private final double PIVOT_GEAR_RATIO = (1/5281.1);
     private final double COMPENSATION_VOLTAGE = 12.30;
-    private final double HIGH_BUCKET_ANGLE = 2.58;
+    private final double HIGH_BUCKET_ANGLE = 2.24;
     public PIController pivotController = new PIController(1, 0.002);
-    public PIController extendController = new PIController(0.5, 0.001);
+    public PIController extendController = new PIController(0.55, 0.001);
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -42,8 +41,8 @@ public class Teleop extends LinearOpMode {
         DcMotorEx extendOne = hardwareMap.get(DcMotorEx.class, "extendOne");
         DcMotorEx extendTwo = hardwareMap.get(DcMotorEx.class, "extendTwo");
 
-        Servo leftCollectServo = hardwareMap.get(Servo.class, "vexleft");
-        Servo rightCollectServo = hardwareMap.get(Servo.class, "vexright");
+        CRServo leftCollectServo = hardwareMap.get(CRServo.class, "vexleft");
+        CRServo rightCollectServo = hardwareMap.get(CRServo.class, "vexright");
         Servo bumper = hardwareMap.get(Servo.class, "bumper");
 
         ActionExecutor executor = new ActionExecutor();
@@ -53,18 +52,34 @@ public class Teleop extends LinearOpMode {
         extendOne.setDirection(DcMotorSimple.Direction.FORWARD);
         extendTwo.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        leftCollectServo.setDirection(Servo.Direction.REVERSE);
-        rightCollectServo.setDirection(Servo.Direction.REVERSE);
+        leftCollectServo.setDirection(CRServo.Direction.REVERSE);
+        rightCollectServo.setDirection(CRServo.Direction.REVERSE);
 
         pivotMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         pivotMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         extendOne.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
+        pivotController.setSetpoint(1.34);
+
         waitForStart();
 
         while (opModeIsActive()) {
-            pivotController.setSetpoint(pivotController.getSetpoint() + gamepad2.left_stick_y * 0.09817477);
-            extendController.setSetpoint(extendController.getSetpoint() + gamepad2.right_stick_y * (MAX_EXTEND_ROTATIONS / 32));
+            double gamepad_2_left_stick_y = gamepad2.left_stick_y * -1;
+            double gamepad_2_right_stick_y = gamepad2.right_stick_y * -1;
+
+            double gamepad_1_left_stick_x = gamepad1.left_stick_x * -1;
+            double gamepad_1_left_stick_y = gamepad1.left_stick_y;
+            double gamepad_1_right_stick_x = gamepad1.right_stick_x;
+
+            double desiredPivot = pivotController.getSetpoint() + gamepad_2_left_stick_y * 0.09817477;
+            desiredPivot = Math.min(desiredPivot, 2.25);
+            desiredPivot = Math.max(desiredPivot, 0);
+            pivotController.setSetpoint(desiredPivot);
+
+            double desiredExtend = extendController.getSetpoint() + gamepad_2_right_stick_y * (MAX_EXTEND_ROTATIONS / 32);
+            desiredExtend = Math.min(desiredExtend, MAX_EXTEND_ROTATIONS);
+            desiredExtend = Math.max(desiredExtend, 0);
+            extendController.setSetpoint(desiredExtend);
 
             if (gamepad1.a) {
                 executor.run(new SequentialAction(rotateArm(HIGH_BUCKET_ANGLE), extendArm(MAX_EXTEND_ROTATIONS / 2, extendOne, extendTwo)));
@@ -82,16 +97,16 @@ public class Teleop extends LinearOpMode {
             }
 
             if (gamepad1.left_bumper) {
-                leftCollectServo.setPosition(0.88);
-                rightCollectServo.setPosition(0.88);
+                leftCollectServo.setPower(0.4);
+                rightCollectServo.setPower(0.4);
             } else {
-                leftCollectServo.setPosition(0);
-                rightCollectServo.setPosition(0);
+                leftCollectServo.setPower(0);
+                rightCollectServo.setPower(0);
             }
 
             if (gamepad1.b) {
                 // -0.15 was estimated to close to specified encoder counts when at rest but I didn't get to test before leaving.
-                executor.run(new SequentialAction(extendArm(0, extendOne, extendTwo), rotateArm(-0.15)));
+                executor.run(new SequentialAction(extendArm(-0.47, extendOne, extendTwo), rotateArm(-0.15)));
             }
 
             executePivotControl(pivotMotor, voltageSensor);
@@ -102,7 +117,7 @@ public class Teleop extends LinearOpMode {
             telemetry.addData("front left vel", drive.getLeftFrontVel());
             telemetry.addData("front right vel", drive.getRightFrontVel());
 
-            drive.setDriveCommand(gamepad1.left_stick_x * -1, gamepad1.left_stick_y, gamepad1.right_stick_x);
+            drive.setDriveCommand(gamepad_1_left_stick_x, gamepad_1_left_stick_y, gamepad_1_right_stick_x);
 
             telemetry.update();
             executor.execute();
@@ -114,7 +129,7 @@ public class Teleop extends LinearOpMode {
      * In order to control the arm you need to call the pivot pid controller separately.
      */
     private void executePivotControl(DcMotorEx pivotMotor, VoltageSensor voltageSensor) {
-        double motorRotationsRad = (pivotMotor.getCurrentPosition() * PIVOT_GEAR_RATIO * 2 * Math.PI);
+        double motorRotationsRad = (pivotMotor.getCurrentPosition() * PIVOT_GEAR_RATIO * 2 * Math.PI) + 1.34;
         double pivotEffort = pivotController.calculate(motorRotationsRad) * (COMPENSATION_VOLTAGE / voltageSensor.getVoltage());
         pivotEffort = MathUtils.Helpers.clamp(pivotEffort, -1, 1);
 
@@ -150,10 +165,12 @@ public class Teleop extends LinearOpMode {
     public Action extendArm(double distance, DcMotorEx extendOne, DcMotorEx extendTwo) {
         return new Action() {
             boolean init = false;
+            double startTime = 0;
             @Override
             public boolean run(@NonNull TelemetryPacket telemetryPacket) {
                 if (!init) {
                     extendController.setSetpoint(distance);
+                    startTime = System.currentTimeMillis();
                 }
 
                 // Exit if below 0.15 rotations of error
@@ -181,12 +198,13 @@ public class Teleop extends LinearOpMode {
     public Action rotateArm(double angle) {
         return new Action() {
             boolean init = false;
-
+            double startTime = 0;
             @Override
             public boolean run(@NonNull TelemetryPacket telemetryPacket) {
                 if (init == false) {
                     pivotController.setSetpoint(angle);
                     init = true;
+                    startTime = System.currentTimeMillis();
                 }
 
                 // Exit if below 0.15 radians of error
