@@ -23,8 +23,6 @@ import org.firstinspires.ftc.teamcode.MathUtils;
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.PIController;
 
-import java.util.Timer;
-
 // http://192.168.43.1:8080/dash
 @Autonomous(name = "High Bucket Ascent")
 public final class HighBucketToAscentAuto extends LinearOpMode {
@@ -64,9 +62,9 @@ public final class HighBucketToAscentAuto extends LinearOpMode {
         waitForStart();
 
         Action goToBucketStrafe = drive.actionBuilder(beginPose)
-                .strafeTo(new Vector2d(-13, 17))
+                .strafeTo(new Vector2d(-13, 20))
                                 .build();
-        Action leave = drive.actionBuilder(new Pose2d(-10, 15, 0)).strafeToSplineHeading(new Vector2d(15, 40), -Math.PI/6).strafeToSplineHeading(new Vector2d(40, 40), -Math.PI/6).build();
+        Action leave = drive.actionBuilder(new Pose2d(-10, 15, 0)).strafeToSplineHeading(new Vector2d(15, 15), -Math.PI/6).strafeToSplineHeading(new Vector2d(20, 20), -Math.PI/6).build();
         Action wait = drive.actionBuilder(new Pose2d(40, 20, 0)).waitSeconds(2).build();
 
         Actions.runBlocking(
@@ -87,7 +85,7 @@ public final class HighBucketToAscentAuto extends LinearOpMode {
                                 // Stop the collector
                                 new InstantAction(() -> { leftCollectServo.setPower(0); rightCollectServo.setPower(0); bumper.setPosition(0.2); }),
                                 // Bring the arm to zero
-                                new ParallelAction(leave, rotateArm(1.34)),
+                                new ParallelAction(leave, rotateArm(1.40)),
                                 // Stop any parallel actions
                                 new InstantAction(() -> autoIsComplete = true)
                         )

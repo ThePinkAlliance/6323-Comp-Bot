@@ -4,9 +4,14 @@ import androidx.annotation.NonNull;
 
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.InstantAction;
+import com.acmerobotics.roadrunner.ParallelAction;
+import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.SequentialAction;
+import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.ftc.Actions;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -15,25 +20,19 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.teamcode.MathUtils;
+import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.PIController;
-import org.firstinspires.ftc.teamcode.lib.ActionExecutor;
-import org.firstinspires.ftc.teamcode.subsystems.Drive;
 
-/**
- * Servo port 0-1 are the vex servos
- * Servo port 2 is the gobuilda spin servo
- */
-@TeleOp(name = "Teleop")
-public class Teleop extends LinearOpMode {
-    // On arm extend subtracted 0.5 from max extend length and it reached max
-    private final double MAX_EXTEND_ROTATIONS = 6.539;
-    private final double PIVOT_ZERO_OFFSET_RAD = 0.6258;
-    // Amount of encoder ticks per rotation
-    private final double PIVOT_GEAR_RATIO = (1/5281.1);
+// http://192.168.43.1:8080/dash
+@Autonomous(name = "High Bucket")
+public final class HighBucketAuto extends LinearOpMode {
+    private boolean autoIsComplete = false;
     private final double COMPENSATION_VOLTAGE = 12.30;
-    private final double HIGH_BUCKET_ANGLE = 2.24;
+    private final double PIVOT_GEAR_RATIO = (1/5281.1);
+    private final double MAX_EXTEND_ROTATIONS = 6.539;
+
     public PIController pivotController = new PIController(1, 0.002);
-    public PIController extendController = new PIController(0.55, 0.001);
+    public PIController extendController = new PIController(0.5, 0.001);
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -45,83 +44,71 @@ public class Teleop extends LinearOpMode {
         CRServo rightCollectServo = hardwareMap.get(CRServo.class, "vexright");
         Servo bumper = hardwareMap.get(Servo.class, "bumper");
 
-        ActionExecutor executor = new ActionExecutor();
         VoltageSensor voltageSensor = hardwareMap.voltageSensor.iterator().next();
-        Drive drive = new Drive(hardwareMap);
+
+        Pose2d beginPose = new Pose2d(0, 0, 0);
+        MecanumDrive drive = new MecanumDrive(hardwareMap, beginPose);
 
         extendOne.setDirection(DcMotorSimple.Direction.FORWARD);
         extendTwo.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        leftCollectServo.setDirection(CRServo.Direction.REVERSE);
-        rightCollectServo.setDirection(CRServo.Direction.REVERSE);
+        leftCollectServo.setDirection(DcMotorSimple.Direction.REVERSE);
+        rightCollectServo.setDirection(DcMotorSimple.Direction.REVERSE);
 
         pivotMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         pivotMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         extendOne.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
-        pivotController.setSetpoint(2.24);
-
         waitForStart();
 
-        while (opModeIsActive()) {
-            double gamepad_2_left_stick_y = gamepad2.left_stick_y * -1;
-            double gamepad_2_right_stick_y = gamepad2.right_stick_y * -1;
+        Action goToBucketStrafe = drive.actionBuilder(beginPose)
+                .strafeTo(new Vector2d(-13, 17))
+                                .build();
+        Action leave = drive.actionBuilder(new Pose2d(-10, 15, 0)).strafeToSplineHeading(new Vector2d(15, 40), -Math.PI/6).strafeToSplineHeading(new Vector2d(40, 40), -Math.PI/6).build();
+        Action wait = drive.actionBuilder(new Pose2d(40, 20, 0)).waitSeconds(2).build();
 
-            double gamepad_1_left_stick_x = gamepad1.left_stick_x * -1;
-            double gamepad_1_left_stick_y = gamepad1.left_stick_y;
-            double gamepad_1_right_stick_x = gamepad1.right_stick_x;
+        Actions.runBlocking(
+                    new ParallelAction(controlAction(extendOne, extendTwo, pivotMotor, voltageSensor),
+                        new SequentialAction(
+                                // Extend to maximum distance
+                                goToBucketStrafe,
+                                rotateArm(2.24),
+                                // Rotate the arm to straight vertical
+                                drive.actionBuilder(new Pose2d(-10, 15, 0)).waitSeconds(1).build(),
+                                // Spin the collector
+                                new InstantAction(() -> {
+                                    bumper.setPosition(0);
+                                    leftCollectServo.setPower(0.4);
+                                    rightCollectServo.setPower(0.4);
+                                }),
+                                wait,
+                                // Stop the collector
+                                new InstantAction(() -> { leftCollectServo.setPower(0); rightCollectServo.setPower(0); bumper.setPosition(0.2); }),
+                                // Bring the arm to zero
+//                                new ParallelAction(leave, rotateArm(1.34)),
+                                // Stop any parallel actions
+                                new InstantAction(() -> autoIsComplete = true)
+                        )
+                ));
+    }
 
-            double desiredPivot = pivotController.getSetpoint() + gamepad_2_left_stick_y * 0.09817477;
-            desiredPivot = Math.min(desiredPivot, 2.25);
-            desiredPivot = Math.max(desiredPivot, 0);
-            pivotController.setSetpoint(desiredPivot);
+    public Action controlAction(DcMotorEx extendOne, DcMotorEx extendTwo, DcMotorEx pivotMotor, VoltageSensor voltageSensor) {
+        return new Action() {
+            @Override
+            public boolean run(@NonNull TelemetryPacket telemetryPacket) {
+                telemetryPacket.put("pivotError", pivotController.getError().get());
+                telemetryPacket.put("extendError", extendController.getError().get());
 
-            double desiredExtend = extendController.getSetpoint() + gamepad_2_right_stick_y * (MAX_EXTEND_ROTATIONS / 32);
-            desiredExtend = Math.min(desiredExtend, MAX_EXTEND_ROTATIONS);
-            desiredExtend = Math.max(desiredExtend, 0);
-            extendController.setSetpoint(desiredExtend);
+                executePivotControl(pivotMotor, voltageSensor);
+                executeExtendControl(extendOne, extendTwo, voltageSensor);
 
-            if (gamepad2.a) {
-                executor.run(new SequentialAction(rotateArm(HIGH_BUCKET_ANGLE), extendArm(MAX_EXTEND_ROTATIONS / 2, extendOne, extendTwo)));
+                if (autoIsComplete) {
+                    return false;
+                }
+
+                return true;
             }
-
-            if (gamepad2.y) {
-                executor.run(new SequentialAction(rotateArm(HIGH_BUCKET_ANGLE), extendArm(MAX_EXTEND_ROTATIONS, extendOne, extendTwo)));
-            }
-
-            // Run the vex servos to run the collector
-            if (gamepad2.right_bumper) {
-                bumper.setPosition(0);
-            } else {
-                bumper.setPosition(0.2);
-            }
-
-            if (gamepad2.left_bumper) {
-                leftCollectServo.setPower(0.4);
-                rightCollectServo.setPower(0.4);
-            } else {
-                leftCollectServo.setPower(0);
-                rightCollectServo.setPower(0);
-            }
-
-            if (gamepad2.b) {
-                // -0.15 was estimated to close to specified encoder counts when at rest but I didn't get to test before leaving.
-                executor.run(new SequentialAction(extendArm(-0.47, extendOne, extendTwo), rotateArm(-0.15)));
-            }
-
-            executePivotControl(pivotMotor, voltageSensor);
-            executeExtendControl(extendOne, extendTwo, voltageSensor);
-
-            telemetry.addData("back right vel", drive.getRightBackVel());
-            telemetry.addData("back left vel", drive.getLeftBackVel());
-            telemetry.addData("front left vel", drive.getLeftFrontVel());
-            telemetry.addData("front right vel", drive.getRightFrontVel());
-
-            drive.setDriveCommand(gamepad_1_left_stick_x, gamepad_1_left_stick_y, gamepad_1_right_stick_x);
-
-            telemetry.update();
-            executor.execute();
-        }
+        };
     }
 
     /**
@@ -158,11 +145,9 @@ public class Teleop extends LinearOpMode {
 
     /**
      * @param distance in rotations
-     * @param extendOne left extend motor
-     * @param extendTwo right extend motor (without encoder cable)
      * @return
      */
-    public Action extendArm(double distance, DcMotorEx extendOne, DcMotorEx extendTwo) {
+    public Action extendArm(double distance) {
         return new Action() {
             boolean init = false;
             double startTime = 0;
@@ -171,6 +156,10 @@ public class Teleop extends LinearOpMode {
                 if (!init) {
                     extendController.setSetpoint(distance);
                     startTime = System.currentTimeMillis();
+                }
+
+                if ((System.currentTimeMillis() - startTime) >= 1000) {
+                    return false;
                 }
 
                 // Exit if below 0.15 rotations of error
@@ -205,6 +194,10 @@ public class Teleop extends LinearOpMode {
                     pivotController.setSetpoint(angle);
                     init = true;
                     startTime = System.currentTimeMillis();
+                }
+
+                if ((System.currentTimeMillis() - startTime) >= 1000) {
+                    return false;
                 }
 
                 // Exit if below 0.15 radians of error
